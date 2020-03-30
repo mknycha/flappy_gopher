@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
@@ -39,6 +41,12 @@ func run() error {
 	}
 	w.UpdateSurface()
 
+	time.Sleep(1 * time.Second)
+
+	if err := drawBackground(r); err != nil {
+		return fmt.Errorf("could not draw background: %w", err)
+	}
+
 	running := true
 	for running {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -51,6 +59,23 @@ func run() error {
 		}
 	}
 
+	return nil
+}
+
+func drawBackground(r *sdl.Renderer) error {
+	r.Clear()
+
+	t, err := img.LoadTexture(r, "./res/images/background.png")
+	if err != nil {
+		return fmt.Errorf("could not load background: %w", err)
+	}
+	defer t.Destroy()
+	err = r.Copy(t, nil, nil)
+	if err != nil {
+		return fmt.Errorf("could not copy background: %w", err)
+	}
+
+	r.Present()
 	return nil
 }
 
