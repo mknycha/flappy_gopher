@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"time"
 
 	"github.com/veandco/go-sdl2/img"
@@ -41,25 +42,25 @@ func run() error {
 	}
 	w.UpdateSurface()
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(1)
 
-	if err := drawBackground(r); err != nil {
-		return fmt.Errorf("could not draw background: %w", err)
+	s, err := newScene(r)
+	if err != nil {
+		return fmt.Errorf("could not create a scene: %w", err)
 	}
+	defer s.destroy()
 
-	running := true
-	for running {
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch event.(type) {
-			case *sdl.QuitEvent:
-				println("Quit")
-				running = false
-				break
-			}
+	events := make(chan sdl.Event)
+	errc := s.run(events, r)
+
+	runtime.LockOSThread()
+	for {
+		select {
+		case events <- sdl.WaitEvent():
+		case err := <-errc:
+			return err
 		}
 	}
-
-	return nil
 }
 
 func drawBackground(r *sdl.Renderer) error {
