@@ -42,7 +42,10 @@ func run() error {
 	}
 	w.UpdateSurface()
 
-	time.Sleep(1)
+	timeStart := time.Now()
+	for time.Now().Before(timeStart.Add(1 * time.Second)) {
+		_ = sdl.PollEvent()
+	}
 
 	s, err := newScene(r)
 	if err != nil {
@@ -51,8 +54,10 @@ func run() error {
 	defer s.destroy()
 
 	events := make(chan sdl.Event)
+
 	errc := s.run(events, r)
 
+	// this way sdl.WaitEvent will be called only in the main goroutine, otherwise it can be swtiched to another one
 	runtime.LockOSThread()
 	for {
 		select {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/veandco/go-sdl2/img"
@@ -29,7 +30,7 @@ func newScene(r *sdl.Renderer) (*scene, error) {
 }
 
 // returns a channel we want to read from
-func (s *scene) run(events chan sdl.Event, r *sdl.Renderer) <-chan error {
+func (s *scene) run(events <-chan sdl.Event, r *sdl.Renderer) <-chan error {
 	errc := make(chan error)
 
 	go func() {
@@ -38,12 +39,9 @@ func (s *scene) run(events chan sdl.Event, r *sdl.Renderer) <-chan error {
 		for {
 			select {
 			case event := <-events:
-				switch event.(type) {
-				case *sdl.QuitEvent:
+				if done := s.handleEvent(event); done {
 					return
 				}
-			// we try to get context done
-			// context will be done whenever the scene should finish
 			case <-tick:
 				if err := s.paint(r); err != nil {
 					errc <- err
@@ -52,6 +50,23 @@ func (s *scene) run(events chan sdl.Event, r *sdl.Renderer) <-chan error {
 		}
 	}()
 	return errc
+}
+
+func (s *scene) handleEvent(event sdl.Event) bool {
+	switch e := event.(type) {
+	case *sdl.QuitEvent:
+		return true
+	case *sdl.KeyboardEvent:
+		log.Println(e.Type)
+		if e.Type == uint32(768) {
+			s.bird.jump()
+		}
+	case *sdl.MouseMotionEvent, *sdl.WindowEvent, *sdl.TouchFingerEvent:
+		// just to clean logs
+	default:
+		log.Printf("unknown event: %T", event)
+	}
+	return false
 }
 
 func (s *scene) paint(r *sdl.Renderer) error {
