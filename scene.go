@@ -10,9 +10,9 @@ import (
 )
 
 type scene struct {
-	time int
 	bg   *sdl.Texture
 	bird *bird
+	pipe *pipe
 }
 
 func newScene(r *sdl.Renderer) (*scene, error) {
@@ -26,7 +26,12 @@ func newScene(r *sdl.Renderer) (*scene, error) {
 		return nil, fmt.Errorf("could initialize bird: %w", err)
 	}
 
-	return &scene{bg: bg, bird: bird}, nil
+	pipe, err := newPipe(r)
+	if err != nil {
+		return nil, fmt.Errorf("could initialize pipe: %w", err)
+	}
+
+	return &scene{bg: bg, bird: bird, pipe: pipe}, nil
 }
 
 // returns a channel we want to read from
@@ -43,6 +48,12 @@ func (s *scene) run(events <-chan sdl.Event, r *sdl.Renderer) <-chan error {
 					return
 				}
 			case <-tick:
+				s.update()
+				if s.bird.isDead() {
+					drawTitle(r, "Game over")
+					time.Sleep(1 * time.Second)
+					s.restart()
+				}
 				if err := s.paint(r); err != nil {
 					errc <- err
 				}
@@ -69,9 +80,18 @@ func (s *scene) handleEvent(event sdl.Event) bool {
 	return false
 }
 
-func (s *scene) paint(r *sdl.Renderer) error {
-	s.time++
+func (s *scene) update() {
+	s.bird.update()
+	s.pipe.update()
+	s.bird.touch(s.pipe)
+}
 
+func (s *scene) restart() {
+	s.bird.restart()
+	s.pipe.restart()
+}
+
+func (s *scene) paint(r *sdl.Renderer) error {
 	r.Clear()
 
 	err := r.Copy(s.bg, nil, nil)
@@ -83,6 +103,10 @@ func (s *scene) paint(r *sdl.Renderer) error {
 	if err != nil {
 		return fmt.Errorf("could not paint bird: %w", err)
 	}
+	err = s.pipe.paint(r)
+	if err != nil {
+		return fmt.Errorf("could not paint pipe: %w", err)
+	}
 
 	r.Present()
 	return nil
@@ -91,4 +115,5 @@ func (s *scene) paint(r *sdl.Renderer) error {
 func (s *scene) destroy() {
 	s.bg.Destroy()
 	s.bird.destroy()
+	s.pipe.destroy()
 }
