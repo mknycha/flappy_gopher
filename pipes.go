@@ -2,38 +2,114 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
+
+type pipes struct {
+	// we need to keep the list of pipes protected
+	mu      sync.RWMutex
+	texture *sdl.Texture
+	speed   int32
+
+	// it must a slice of pointers, because when iterating we want to modify actual pipe, not a copy of it
+	pipes []*pipe
+}
 
 type pipe struct {
 	mu       sync.RWMutex
 	x        int32
 	h        int32
 	w        int32
-	speed    int32
 	inverted bool
-	texture  *sdl.Texture
 }
 
-func newPipe(r *sdl.Renderer) (*pipe, error) {
+func newPipes(r *sdl.Renderer) (*pipes, error) {
 	t, err := img.LoadTexture(r, "./res/images/pipe.png")
 	if err != nil {
 		return nil, fmt.Errorf("could not load pipe image: %w", err)
 	}
-	return &pipe{
-		x:        400,
-		h:        300,
-		w:        50,
-		speed:    1,
-		inverted: true,
-		texture:  t,
-	}, nil
+
+	ps := &pipes{
+		speed:   2,
+		texture: t,
+	}
+	go func() {
+		for {
+			ps.mu.Lock()
+			ps.pipes = append(ps.pipes, newPipe())
+			ps.mu.Unlock()
+			time.Sleep(time.Second)
+		}
+	}()
+
+	return ps, nil
 }
 
-func (p *pipe) paint(r *sdl.Renderer) error {
+func newPipe() *pipe {
+	return &pipe{
+		x:        800,
+		h:        100 + int32(rand.Intn(300)),
+		w:        50,
+		inverted: rand.Float32() > 0.5,
+	}
+}
+
+func (ps *pipes) paint(r *sdl.Renderer) error {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+
+	for _, p := range ps.pipes {
+		if err := p.paint(r, ps.texture); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (ps *pipes) touch(b *bird) {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+
+	for _, p := range ps.pipes {
+		p.touch(b)
+	}
+}
+
+func (ps *pipes) restart() {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	ps.pipes = nil
+}
+
+func (ps *pipes) update() {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	var rem []*pipe
+	for _, p := range ps.pipes {
+		p.update(ps.speed)
+		if p.x+p.w > 0 {
+			rem = append(rem, p)
+		}
+	}
+	ps.pipes = rem
+}
+
+func (ps *pipes) destroy() {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	ps.texture.Destroy()
+}
+
+func (p *pipe) paint(r *sdl.Renderer, texture *sdl.Texture) error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -45,7 +121,7 @@ func (p *pipe) paint(r *sdl.Renderer) error {
 		flip = sdl.FLIP_VERTICAL
 	}
 
-	err := r.CopyEx(p.texture, nil, rect, 0, nil, flip)
+	err := r.CopyEx(texture, nil, rect, 0, nil, flip)
 	if err != nil {
 		return fmt.Errorf("could not copy background: %w", err)
 	}
@@ -53,23 +129,16 @@ func (p *pipe) paint(r *sdl.Renderer) error {
 	return nil
 }
 
-func (p *pipe) restart() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (p *pipe) touch(b *bird) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
-	p.x = 400
+	b.touch(p)
 }
 
-func (p *pipe) update() {
+func (p *pipe) update(speed int32) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.x -= p.speed
-}
-
-func (p *pipe) destroy() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.texture.Destroy()
+	p.x -= speed
 }

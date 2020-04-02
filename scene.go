@@ -10,9 +10,9 @@ import (
 )
 
 type scene struct {
-	bg   *sdl.Texture
-	bird *bird
-	pipe *pipe
+	bg    *sdl.Texture
+	bird  *bird
+	pipes *pipes
 }
 
 func newScene(r *sdl.Renderer) (*scene, error) {
@@ -26,12 +26,12 @@ func newScene(r *sdl.Renderer) (*scene, error) {
 		return nil, fmt.Errorf("could initialize bird: %w", err)
 	}
 
-	pipe, err := newPipe(r)
+	pipes, err := newPipes(r)
 	if err != nil {
 		return nil, fmt.Errorf("could initialize pipe: %w", err)
 	}
 
-	return &scene{bg: bg, bird: bird, pipe: pipe}, nil
+	return &scene{bg: bg, bird: bird, pipes: pipes}, nil
 }
 
 // returns a channel we want to read from
@@ -82,13 +82,13 @@ func (s *scene) handleEvent(event sdl.Event) bool {
 
 func (s *scene) update() {
 	s.bird.update()
-	s.pipe.update()
-	s.bird.touch(s.pipe)
+	s.pipes.update()
+	s.pipes.touch(s.bird)
 }
 
 func (s *scene) restart() {
 	s.bird.restart()
-	s.pipe.restart()
+	s.pipes.restart()
 }
 
 func (s *scene) paint(r *sdl.Renderer) error {
@@ -103,7 +103,7 @@ func (s *scene) paint(r *sdl.Renderer) error {
 	if err != nil {
 		return fmt.Errorf("could not paint bird: %w", err)
 	}
-	err = s.pipe.paint(r)
+	err = s.pipes.paint(r)
 	if err != nil {
 		return fmt.Errorf("could not paint pipe: %w", err)
 	}
@@ -115,5 +115,5 @@ func (s *scene) paint(r *sdl.Renderer) error {
 func (s *scene) destroy() {
 	s.bg.Destroy()
 	s.bird.destroy()
-	s.pipe.destroy()
+	s.pipes.destroy()
 }
